@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privat Schulportal</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #000000;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+
+    .card {
+      background-color: #fff;
+      padding: 25px;
+      margin: 20px 0;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background-color: #f5f5f5;
+      font-size: 16px;
+      color: #333;
+    }
+
+    button {
+      background-color: #6200ea;
+      border: none;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #3700b3;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: #6200ea;
+      outline: none;
+    }
+
+    h2, h3 {
+      color: #333;
+    }
+
+    h3 {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #5f6368;
+    }
+
+    .assignments-list, .students-list, .teachers-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .assignments-list li, .students-list li, .teachers-list li {
+      background-color: #f5f5f5;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .assignments-list li button, .students-list li button, .teachers-list li button {
+      background-color: #e53935;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .assignments-list li button:hover, .students-list li button:hover, .teachers-list li button:hover {
+      background-color: #c62828;
+    }
+
+    .file-link {
+      color: #6200ea;
+      text-decoration: none;
+    }
+
+    .file-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login Form -->
+  <div id="login" class="card">
+    <h2>Login</h2>
+    <input id="loginEmail" type="email" placeholder="E-Mail" required>
+    <input id="loginPassword" type="password" placeholder="Passwort" required>
+    <button onclick="login()">Anmelden</button>
+  </div>
+
+  <!-- Register Form (Hidden) -->
+  <div id="register" class="card hidden">
+    <h2>Neuen Benutzer anlegen</h2>
+    <input id="newUserEmail" type="email" placeholder="E-Mail" required>
+    <input id="newUserPass" type="password" placeholder="Passwort" required>
+    <select id="newUserRole">
+      <option value="student">Schüler</option>
+      <option value="teacher">Lehrer</option>
+    </select>
+    <button onclick="register()">Registrieren</button>
+  </div>
+
+  <!-- Admin Dashboard (Hidden) -->
+  <div id="adminDashboard" class="card hidden">
+    <h2>Admin Dashboard</h2>
+    <h3>Schüler und Lehrer verwalten</h3>
+    <div id="adminControls"></div>
+
+    <h3>Benutzer hinzufügen</h3>
+    <input id="newStudentEmail" type="email" placeholder="Neue Schüler E-Mail" required>
+    <input id="newStudentPass" type="password" placeholder="Passwort" required>
+    <button onclick="addStudent()">Schüler hinzufügen</button>
+
+    <input id="newTeacherEmail" type="email" placeholder="Neue Lehrer E-Mail" required>
+    <input id="newTeacherPass" type="password" placeholder="Passwort" required>
+    <button onclick="addTeacher()">Lehrer hinzufügen</button>
+  </div>
+
+  <!-- Teacher Dashboard (Hidden) -->
+  <div id="teacherDashboard" class="card hidden">
+    <h2>Lehrer Dashboard</h2>
+    <h3>Aufgaben erstellen</h3>
+    <div id="teacherAssignments"></div>
+    <h3>Aufgaben von Schülern</h3>
+    <div id="teacherSubmissions"></div>
+  </div>
+
+  <!-- Student Dashboard (Hidden) -->
+  <div id="studentDashboard" class="card hidden">
+    <h2>Schüler Dashboard</h2>
+    <h3>Deine Aufgaben</h3>
+    <div id="studentAssignments"></div>
+  </div>
+
+  <script>
+    let users = JSON.parse(localStorage.getItem('users') || '{"admin@schule.de": {"password": "1234", "role": "admin"}}');
+    let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+    let assignments = JSON.parse(localStorage.getItem('assignments') || '[]');
+    let submissions = JSON.parse(localStorage.getItem('submissions') || '{}');
+    let notes = JSON.parse(localStorage.getItem('notes') || '{}');
+
+    // ========== LOGIN ==========
+
+    function login() {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      // Admin-Login
+      if (email === "admin@schule.de" && password === "1234") {
+        currentUser = { email, role: "admin" }; // Admin-Rechte
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        showDashboard();
+      }
+      // Login für andere Benutzer (Lehrer und Schüler)
+      else if (users[email] && users[email].password === password) {
+        currentUser = { email, role: users[email].role };
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        showDashboard();
+      } else {
+        alert("Falsche E-Mail oder Passwort.");
+      }
+    }
+
+    // ========== DASHBOARD ANZEIGEN (ABHÄNGIG VON DER ROLLE) ==========
+
+    function showDashboard() {
+      const user = JSON.parse(localStorage.getItem('currentUser'));
+      if (!user) return;
+
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('register').classList.add('hidden');
+
+      if (user.role === 'admin') {
+        showAdminDashboard();
+      } else if (user.role === 'teacher') {
+        showTeacherDashboard();
+      } else if (user.role === 'student') {
+        showStudentDashboard(user.email);
+      }
+    }
+
+    // ========== ADMIN-DASHBOARD ==========
+
+    function showAdminDashboard() {
+      document.getElementById('adminDashboard').classList.remove('hidden');
+      document.getElementById('teacherDashboard').classList.add('hidden');
+      document.getElementById('studentDashboard').classList.add('hidden');
+      
+      renderAdminControls();
+    }
+
+    function renderAdminControls() {
+      const container = document.getElementById('adminControls');
+      container.innerHTML = '<h3>Benutzer verwalten</h3>';
+      
+      const students = Object.keys(users).filter(email => users[email].role === 'student');
+      container.innerHTML += students.length === 0 ? '<p>Keine Schüler vorhanden.</p>' : `
+        <ul class="students-list">
+          ${students.map(email => `<li>${email} <button onclick="removeUser('${email}')">Löschen</button></li>`).join('')}
+        </ul>
+      `;
+      
+      const teachers = Object.keys(users).filter(email => users[email].role === 'teacher');
+      container.innerHTML += teachers.length === 0 ? '<p>Keine Lehrer vorhanden.</p>' : `
+        <ul class="teachers-list">
+          ${teachers.map(email => `<li>${email} <button onclick="removeUser('${email}')">Löschen</button></li>`).join('')}
+        </ul>
+      `;
+    }
+
+    function removeUser(email) {
+      if (confirm(`Möchten Sie den Benutzer ${email} löschen?`)) {
+        delete users[email];
+        localStorage.setItem('users', JSON.stringify(users));
+        alert(`Benutzer ${email} wurde gelöscht.`);
+        renderAdminControls();
+      }
+    }
+
+    // ========== LEHRER-DASHBOARD ==========
+
+    function showTeacherDashboard() {
+      document.getElementById('teacherDashboard').classList.remove('hidden');
+      document.getElementById('adminDashboard').classList.add('hidden');
+      document.getElementById('studentDashboard').classList.add('hidden');
+      
+      renderAssignmentsEditor();
+      renderTeacherSubmissions();
+    }
+
+    function renderAssignmentsEditor() {
+      const container = document.getElementById('teacherAssignments');
+      container.innerHTML = `
+        <h3>Neue Aufgabe erstellen</h3>
+        <input id="taskTitle" type="text" placeholder="Aufgaben-Titel">
+        <textarea id="taskDesc" placeholder="Aufgaben-Beschreibung"></textarea>
+        <input id="taskDue" type="date" placeholder="Fälligkeitsdatum">
+        <input id="taskFile" type="file" placeholder="Datei anhängen">
+        <button onclick="addAssignment()">Aufgabe hinzufügen</button>
+      `;
+      
+      const taskList = document.createElement('div');
+      taskList.innerHTML = '<h4>Bestehende Aufgaben:</h4>' + assignments.map((a, i) =>
+        `<div>
+          <b>${a.title}</b> - bis ${a.due}<br>${a.desc}
+          ${a.file ? `<br><a href="${a.file}" target="_blank" class="file-link">Dokument anzeigen</a>` : ''}
+        </div>`
+      ).join('');
+      
+      container.appendChild(taskList);
+    }
+
+    function addAssignment() {
+      const title = document.getElementById('taskTitle').value;
+      const desc = document.getElementById('taskDesc').value;
+      const due = document.getElementById('taskDue').value;
+      const fileInput = document.getElementById('taskFile');
+
+      let fileURL = null;
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        fileURL = URL.createObjectURL(file); // Erstellen einer URL für das angehängte Dokument
+      }
+
+      if (title && desc && due) {
+        assignments.push({ title, desc, due, file: fileURL });
+        localStorage.setItem('assignments', JSON.stringify(assignments));
+        alert("Aufgabe erstellt!");
+        location.reload();
+      }
+    }
+
+    function renderTeacherSubmissions() {
+      const container = document.getElementById('teacherSubmissions');
+      container.innerHTML = '<h3>Schüler Aufgaben</h3>';
+      // Anzeige der Schüleraufgaben, hier nur als Beispiel.
+      assignments.forEach((assignment, index) => {
+        container.innerHTML += `<p>Aufgabe: ${assignment.title} (Bis: ${assignment.due})</p>`;
+      });
+    }
+
+    // ========== SCHÜLER-DASHBOARD ==========
+
+    function showStudentDashboard(email) {
+      document.getElementById('studentDashboard').classList.remove('hidden');
+      document.getElementById('adminDashboard').classList.add('hidden');
+      document.getElementById('teacherDashboard').classList.add('hidden');
+      
+      renderStudentAssignments(email);
+    }
+
+    function renderStudentAssignments(email) {
+      const container = document.getElementById('studentAssignments');
+      container.innerHTML = `<h3>Deine Aufgaben:</h3>`;
+
+      assignments.forEach((a, i) => {
+        const status = submissions[`${email}-${i}`] ? "Abgegeben" : "Nicht abgegeben";
+        container.innerHTML += `
+          <div>
+            <b>${a.title}</b> - bis ${a.due} | Status: ${status}
+            ${a.file ? `<br><a href="${a.file}" target="_blank" class="file-link">Dokument herunterladen</a>` : ''}
+            <input type="file" onchange="submitAssignment('${email}', ${i}, this)">
+          </div>
+        `;
+      });
+    }
+
+    function submitAssignment(email, index, input) {
+      if (input.files.length > 0) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function() {
+          const key = `${email}-${index}`;
+          submissions[key] = { fileName: file.name, fileData: reader.result };
+          localStorage.setItem('submissions', JSON.stringify(submissions));
+          alert("Aufgabe eingereicht.");
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // ========== SCHÜLER REGISTRIEREN (NUR ADMIN) ==========
+
+    function addStudent() {
+      const email = document.getElementById('newStudentEmail').value;
+      const password = document.getElementById('newStudentPass').value;
+
+      if (users[email]) {
+        alert("Dieser Benutzer existiert bereits.");
+      } else {
+        users[email] = { password, role: "student" };
+        localStorage.setItem('users', JSON.stringify(users));
+        alert("Schüler hinzugefügt.");
+      }
+    }
+
+    function addTeacher() {
+      const email = document.getElementById('newTeacherEmail').value;
+      const password = document.getElementById('newTeacherPass').value;
+
+      if (users[email]) {
+        alert("Dieser Benutzer existiert bereits.");
+      } else {
+        users[email] = { password, role: "teacher" };
+        localStorage.setItem('users', JSON.stringify(users));
+        alert("Lehrer hinzugefügt.");
+      }
+    }
+  </script>
+
+</body>
+</html>
